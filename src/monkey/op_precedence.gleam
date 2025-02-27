@@ -1,6 +1,8 @@
 pub type OpPrecedence =
   Int
 
+pub const index: OpPrecedence = 7
+
 pub const call: OpPrecedence = 6
 
 pub const prefix: OpPrecedence = 5

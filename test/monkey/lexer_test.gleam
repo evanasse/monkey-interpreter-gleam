@@ -23,6 +23,10 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
+\"foobar\"
+\"foo bar\"
+[]
+{\"foo\": \"bar\"}
 "
 
   let test_tokens = [
@@ -99,6 +103,15 @@ if (5 < 10) {
     token.not_equals,
     token.Integer("9"),
     token.semicolon,
+    token.String("foobar"),
+    token.String("foo bar"),
+    token.l_bracket,
+    token.r_bracket,
+    token.l_brace,
+    token.String("foo"),
+    token.colon,
+    token.String("bar"),
+    token.r_brace,
     token.eof,
   ]
 

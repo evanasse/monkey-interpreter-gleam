@@ -198,6 +198,16 @@ fn parse_integer_literal(
   Ok(#(ast.IntegerLiteral(integer_token, integer_value), remaining_tokens))
 }
 
+fn parse_string_literal(
+  remaining_tokens: List(Token),
+  _op_precedence: OpPrecedence,
+) -> Result(#(Node(Expression), List(Token)), ParserError) {
+  use #(string_token, string_value, remaining_tokens) <- result.try(
+    next_token_is_string(remaining_tokens),
+  )
+  Ok(#(ast.StringLiteral(string_token, string_value), remaining_tokens))
+}
+
 fn parse_boolean(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
@@ -380,6 +390,46 @@ fn parse_parameters_loop(
   }
 }
 
+fn parse_array_literal(
+  remaining_tokens: List(Token),
+  _op_precedence: OpPrecedence,
+) -> Result(#(Node(Expression), List(Token)), ParserError) {
+  use #(left_bracket_token, remaining_tokens) <- result.try(
+    next_token_is_left_bracket(remaining_tokens),
+  )
+  use #(elements, remaining_tokens) <- result.try(
+    parse_array_elements([left_bracket_token, ..remaining_tokens]),
+  )
+  Ok(#(ast.ArrayLiteral(left_bracket_token, elements), remaining_tokens))
+}
+
+fn parse_array_elements(
+  remaining_tokens: List(Token),
+) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+  use #(_, remaining_tokens) <- result.try(next_token_is_left_bracket(
+    remaining_tokens,
+  ))
+  parse_array_elements_loop(remaining_tokens, [])
+}
+
+fn parse_array_elements_loop(
+  remaining_tokens: List(Token),
+  elements: List(Node(Expression)),
+) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+  use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
+  case next_token {
+    token.RightBracket(_) -> Ok(#(list.reverse(elements), remaining_tokens))
+    token.Comma(_) -> parse_array_elements_loop(remaining_tokens, elements)
+    _ -> {
+      use #(element, remaining_tokens) <- result.try(parse_expression(
+        [next_token, ..remaining_tokens],
+        op_precedence.lowest,
+      ))
+      parse_array_elements_loop(remaining_tokens, [element, ..elements])
+    }
+  }
+}
+
 fn parse_call_expression(
   remaining_tokens: List(Token),
   function: Node(Expression),
@@ -424,6 +474,88 @@ fn parse_call_arguments_loop(
       parse_call_arguments_loop(remaining_tokens, [argument, ..arguments])
     }
   }
+}
+
+fn parse_index_expression(
+  remaining_tokens: List(Token),
+  left: Node(Expression),
+  _op_precedence: OpPrecedence,
+) -> Result(#(Node(Expression), List(Token)), ParserError) {
+  use #(left_bracket_token, remaining_tokens) <- result.try(
+    next_token_is_left_bracket(remaining_tokens),
+  )
+  use #(index, remaining_tokens) <- result.try(parse_expression(
+    remaining_tokens,
+    op_precedence.lowest,
+  ))
+  use #(_, remaining_tokens) <- result.try(next_token_is_right_bracket(
+    remaining_tokens,
+  ))
+
+  Ok(#(ast.IndexExpression(left_bracket_token, left, index), remaining_tokens))
+}
+
+fn parse_hash_literal(
+  remaining_tokens: List(Token),
+  _op_precedence: OpPrecedence,
+) -> Result(#(Node(Expression), List(Token)), ParserError) {
+  use #(left_brace_token, remaining_tokens) <- result.try(
+    next_token_is_left_brace(remaining_tokens),
+  )
+  use #(pairs, remaining_tokens) <- result.try(parse_hash_pairs(
+    remaining_tokens,
+  ))
+
+  Ok(#(ast.HashLiteral(left_brace_token, pairs), remaining_tokens))
+}
+
+fn parse_hash_pairs(
+  remaining_tokens: List(Token),
+) -> Result(
+  #(List(#(Node(Expression), Node(Expression))), List(Token)),
+  ParserError,
+) {
+  parse_hash_pairs_loop(remaining_tokens, [])
+}
+
+fn parse_hash_pairs_loop(
+  remaining_tokens: List(Token),
+  pairs: List(#(Node(Expression), Node(Expression))),
+) -> Result(
+  #(List(#(Node(Expression), Node(Expression))), List(Token)),
+  ParserError,
+) {
+  use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
+  case next_token {
+    token.RightBrace(_) -> Ok(#(list.reverse(pairs), remaining_tokens))
+    token.Comma(_) -> parse_hash_pairs_loop(remaining_tokens, pairs)
+    _ -> {
+      use #(pair, remaining_tokens) <- result.try(parse_hash_pair(
+        [next_token, ..remaining_tokens],
+        op_precedence.lowest,
+      ))
+      parse_hash_pairs_loop(remaining_tokens, [pair, ..pairs])
+    }
+  }
+}
+
+fn parse_hash_pair(
+  remaining_tokens: List(Token),
+  op_precedence: OpPrecedence,
+) -> Result(#(#(Node(Expression), Node(Expression)), List(Token)), ParserError) {
+  use #(key, remaining_tokens) <- result.try(parse_expression(
+    remaining_tokens,
+    op_precedence,
+  ))
+  use #(_colon_token, remaining_tokens) <- result.try(next_token_is_colon(
+    remaining_tokens,
+  ))
+  use #(value, remaining_tokens) <- result.try(parse_expression(
+    remaining_tokens,
+    op_precedence,
+  ))
+
+  Ok(#(#(key, value), remaining_tokens))
 }
 
 fn next_token_has_prefix_function(
@@ -471,6 +603,20 @@ fn next_token_is_integer(
           }
         }
         _ -> Error(UnexpectedToken([token.Integer("some_integer")], next_token))
+      }
+    }
+    Error(_) -> Error(ExpectedAToken)
+  }
+}
+
+fn next_token_is_string(
+  tokens: List(Token),
+) -> Result(#(Token, String, List(Token)), ParserError) {
+  case tokens |> next_token {
+    Ok(#(next_token, remaining_tokens)) -> {
+      case next_token {
+        token.String(s) -> Ok(#(next_token, s, remaining_tokens))
+        _ -> Error(UnexpectedToken([token.String("some_string")], next_token))
       }
     }
     Error(_) -> Error(ExpectedAToken)
@@ -601,6 +747,34 @@ fn next_token_is_left_parenthesis(
   }
 }
 
+fn next_token_is_left_bracket(
+  tokens: List(Token),
+) -> Result(#(Token, List(Token)), ParserError) {
+  case tokens |> next_token {
+    Ok(#(next_token, remaining_tokens)) -> {
+      case next_token {
+        token.LeftBracket(_) -> Ok(#(next_token, remaining_tokens))
+        _ -> Error(UnexpectedToken([token.l_bracket], next_token))
+      }
+    }
+    Error(_) -> Error(ExpectedAToken)
+  }
+}
+
+fn next_token_is_right_bracket(
+  tokens: List(Token),
+) -> Result(#(Token, List(Token)), ParserError) {
+  case tokens |> next_token {
+    Ok(#(next_token, remaining_tokens)) -> {
+      case next_token {
+        token.RightBracket(_) -> Ok(#(next_token, remaining_tokens))
+        _ -> Error(UnexpectedToken([token.r_bracket], next_token))
+      }
+    }
+    Error(_) -> Error(ExpectedAToken)
+  }
+}
+
 fn next_token_is_left_brace(
   tokens: List(Token),
 ) -> Result(#(Token, List(Token)), ParserError) {
@@ -609,6 +783,20 @@ fn next_token_is_left_brace(
       case next_token {
         token.LeftBrace(_) -> Ok(#(next_token, remaining_tokens))
         _ -> Error(UnexpectedToken([token.l_brace], next_token))
+      }
+    }
+    Error(_) -> Error(ExpectedAToken)
+  }
+}
+
+fn next_token_is_colon(
+  tokens: List(Token),
+) -> Result(#(Token, List(Token)), ParserError) {
+  case tokens |> next_token {
+    Ok(#(next_token, remaining_tokens)) -> {
+      case next_token {
+        token.Colon(_) -> Ok(#(next_token, remaining_tokens))
+        _ -> Error(UnexpectedToken([token.colon], next_token))
       }
     }
     Error(_) -> Error(ExpectedAToken)
@@ -658,11 +846,14 @@ fn get_prefix_parse_functions(
   case token {
     token.Identifier(_) -> Ok(parse_identifier)
     token.Integer(_) -> Ok(parse_integer_literal)
+    token.String(_) -> Ok(parse_string_literal)
     token.Bang(_) | token.Minus(_) -> Ok(parse_prefix_expression)
     token.TRUE(_) | token.FALSE(_) -> Ok(parse_boolean)
     token.LeftParenthesis(_) -> Ok(parse_grouped_expression)
     token.If(_) -> Ok(parse_if_expression)
     token.Function(_) -> Ok(parse_function_literal)
+    token.LeftBracket(_) -> Ok(parse_array_literal)
+    token.LeftBrace(_) -> Ok(parse_hash_literal)
     _ -> Error(NoPrefixFunctionForToken(token))
   }
 }
@@ -680,6 +871,7 @@ fn get_infix_parse_functions(
     | token.LesserThan(_)
     | token.GreaterThan(_) -> Ok(parse_infix_expression)
     token.LeftParenthesis(_) -> Ok(parse_call_expression)
+    token.LeftBracket(_) -> Ok(parse_index_expression)
     _ -> Error(NoInfixFunctionForToken(token))
   }
 }
@@ -691,6 +883,7 @@ fn token_precedence(token: Token) -> OpPrecedence {
     token.Plus(_) | token.Minus(_) -> op_precedence.sum
     token.Asterisk(_) | token.Slash(_) -> op_precedence.product
     token.LeftParenthesis(_) -> op_precedence.call
+    token.LeftBracket(_) -> op_precedence.index
     _ -> op_precedence.lowest
   }
 }

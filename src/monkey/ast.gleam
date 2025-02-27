@@ -10,6 +10,8 @@ pub type Node(t) {
   ExpressionStatement(token: Token, expression: Node(Expression))
   Identifier(token: Token, value: String)
   IntegerLiteral(token: Token, value: Int)
+  StringLiteral(token: Token, value: String)
+  ArrayLiteral(token: Token, elements: List(Node(Expression)))
   Boolean(token: Token, value: Bool)
   PrefixExpression(token: Token, operator: String, right: Node(Expression))
   InfixExpression(
@@ -35,6 +37,8 @@ pub type Node(t) {
     function: Node(Expression),
     arguments: List(Node(Expression)),
   )
+  IndexExpression(token: Token, left: Node(Expression), index: Node(Expression))
+  HashLiteral(token: Token, pairs: List(#(Node(Expression), Node(Expression))))
 }
 
 pub type Expression
@@ -52,6 +56,7 @@ pub fn node_to_string(node: Node(t)) -> String {
       expression_statement_to_string(expression)
     Identifier(_, value) -> value
     IntegerLiteral(token, _) -> token.literal
+    StringLiteral(token, _) -> token.literal
     Boolean(token, _) -> token.literal
     PrefixExpression(_, operator, right) ->
       prefix_expression_to_string(operator, right)
@@ -67,6 +72,9 @@ pub fn node_to_string(node: Node(t)) -> String {
       function_literal_to_string(parameters, body)
     CallExpression(_, function, arguments) ->
       call_expression_to_string(function, arguments)
+    ArrayLiteral(_, elements) -> array_literal_to_string(elements)
+    IndexExpression(_, left, index) -> index_expression_to_string(left, index)
+    HashLiteral(_, pairs) -> hash_literal_to_string(pairs)
   }
 }
 
@@ -159,4 +167,31 @@ fn call_expression_to_string(
   <> "("
   <> arguments |> list.map(expression_to_string) |> string.join(", ")
   <> ")"
+}
+
+fn array_literal_to_string(elements: List(Node(Expression))) -> String {
+  "[" <> elements |> list.map(expression_to_string) |> string.join(", ") <> "]"
+}
+
+fn index_expression_to_string(
+  left: Node(Expression),
+  index: Node(Expression),
+) -> String {
+  "("
+  <> expression_to_string(left)
+  <> "["
+  <> expression_to_string(index)
+  <> "])"
+}
+
+fn hash_literal_to_string(
+  pairs: List(#(Node(Expression), Node(Expression))),
+) -> String {
+  "{"
+  <> pairs
+  |> list.map(fn(pair) {
+    expression_to_string(pair.0) <> ": " <> expression_to_string(pair.1)
+  })
+  |> string.join(", ")
+  <> "}"
 }

@@ -8,6 +8,7 @@ pub type Token {
   // Identifiers + literals
   Identifier(literal: String)
   Integer(literal: String)
+  String(literal: String)
 
   // Operators
   Assign(literal: String)
@@ -24,11 +25,15 @@ pub type Token {
   // Delimiters
   Comma(literal: String)
   Semicolon(literal: String)
+  Colon(literal: String)
 
   LeftParenthesis(literal: String)
   RightParenthesis(literal: String)
   LeftBrace(literal: String)
   RightBrace(literal: String)
+  LeftBracket(literal: String)
+  RightBracket(literal: String)
+  DoubleQuote(literal: String)
 
   // Keywords
   Function(literal: String)
@@ -87,6 +92,14 @@ pub const r_paren: Token = RightParenthesis(")")
 pub const l_brace: Token = LeftBrace("{")
 
 pub const r_brace: Token = RightBrace("}")
+
+pub const l_bracket: Token = LeftBracket("[")
+
+pub const r_bracket: Token = RightBracket("]")
+
+pub const double_quote: Token = DoubleQuote("\"")
+
+pub const colon: Token = Colon(":")
 
 pub const function: Token = Function("fn")
 

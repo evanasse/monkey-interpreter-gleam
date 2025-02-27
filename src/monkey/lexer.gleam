@@ -8,6 +8,7 @@ import monkey/token.{type Token}
 type LexingState {
   ReadingIdentifier
   ReadingNumber
+  ReadingString
   SkippingWhitespace
 }
 
@@ -78,6 +79,8 @@ fn lex_letter(
     Letter(l), ReadingNumber -> Error(IllegalChar(l, lexed_tokens))
     Letter(l), SkippingWhitespace ->
       lex_loop(remaining_input, lexed_tokens, l, ReadingIdentifier)
+    Letter(l), ReadingString ->
+      lex_loop(remaining_input, lexed_tokens, current_word <> l, ReadingString)
     unexpected_type, _ ->
       Error(WrongCharType(expected: Letter("[a-zA-z]"), got: unexpected_type))
   }
@@ -93,6 +96,8 @@ fn lex_digit(
   case digit, lexing_state {
     Digit(d), ReadingNumber ->
       lex_loop(remaining_input, lexed_tokens, current_word <> d, ReadingNumber)
+    Digit(d), ReadingString ->
+      lex_loop(remaining_input, lexed_tokens, current_word <> d, ReadingString)
     Digit(d), _ -> lex_loop(remaining_input, lexed_tokens, d, ReadingNumber)
     unexpected_type, _ ->
       Error(WrongCharType(expected: Digit("[0-9]"), got: unexpected_type))
@@ -128,6 +133,8 @@ fn lex_symbol(
     Symbol("/") -> Ok(token.slash)
     Symbol("{") -> Ok(token.l_brace)
     Symbol("}") -> Ok(token.r_brace)
+    Symbol("[") -> Ok(token.l_bracket)
+    Symbol("]") -> Ok(token.r_bracket)
     Symbol("!") -> {
       case string.pop_grapheme(remaining_input) {
         Error(_) -> Ok(token.bang)
@@ -141,6 +148,8 @@ fn lex_symbol(
     }
     Symbol("<") -> Ok(token.lesser_than)
     Symbol(">") -> Ok(token.greater_than)
+    Symbol("\"") -> Ok(token.double_quote)
+    Symbol(":") -> Ok(token.colon)
     unexpected_type ->
       Error(WrongCharType(expected: Symbol("symbol"), got: unexpected_type))
   }
@@ -156,8 +165,19 @@ fn lex_symbol(
   }
 
   case lexing_state, symbol_token {
-    SkippingWhitespace, Ok(token) ->
-      lex_loop(remaining_input, [token, ..lexed_tokens], "", SkippingWhitespace)
+    SkippingWhitespace, Ok(token) -> {
+      case token {
+        token.DoubleQuote("\"") ->
+          lex_loop(remaining_input, lexed_tokens, "", ReadingString)
+        _ ->
+          lex_loop(
+            remaining_input,
+            [token, ..lexed_tokens],
+            "",
+            SkippingWhitespace,
+          )
+      }
+    }
     ReadingIdentifier, Ok(token) ->
       lex_loop(
         remaining_input,
@@ -172,6 +192,24 @@ fn lex_symbol(
         "",
         SkippingWhitespace,
       )
+    ReadingString, Ok(token) -> {
+      case token {
+        token.DoubleQuote("\"") ->
+          lex_loop(
+            remaining_input,
+            [token.String(current_word), ..lexed_tokens],
+            "",
+            SkippingWhitespace,
+          )
+        _ ->
+          lex_loop(
+            remaining_input,
+            lexed_tokens,
+            current_word <> token.literal,
+            ReadingString,
+          )
+      }
+    }
     _, Error(e) -> Error(e)
   }
 }
@@ -197,6 +235,14 @@ fn lex_whitespace(
         [token.Integer(current_word), ..lexed_tokens],
         "",
         SkippingWhitespace,
+      )
+    }
+    ReadingString -> {
+      lex_loop(
+        remaining_input,
+        lexed_tokens,
+        current_word <> " ",
+        ReadingString,
       )
     }
     SkippingWhitespace -> {
@@ -278,9 +324,13 @@ fn parse_char(char: String) -> CharType {
     Ok(_) if char == "/" -> Symbol(char)
     Ok(_) if char == "{" -> Symbol(char)
     Ok(_) if char == "}" -> Symbol(char)
+    Ok(_) if char == "[" -> Symbol(char)
+    Ok(_) if char == "]" -> Symbol(char)
     Ok(_) if char == "!" -> Symbol(char)
     Ok(_) if char == ">" -> Symbol(char)
     Ok(_) if char == "<" -> Symbol(char)
+    Ok(_) if char == "\"" -> Symbol(char)
+    Ok(_) if char == ":" -> Symbol(char)
     // Whitespace
     Ok(i) if i == space || i == tab || i == newline || i == carriage_return ->
       Whitespace

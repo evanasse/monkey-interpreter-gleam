@@ -42,6 +42,13 @@ pub fn eval_integer_expression_test() {
   |> list.each(test_pair)
 }
 
+pub fn eval_string_expression_test() {
+  let tests = [#("\"Hello World!\"", Ok(object.String("Hello World!")))]
+
+  tests
+  |> list.each(test_pair)
+}
+
 pub fn eval_boolean_expression_test() {
   let tests = [
     #("true", Ok(object.Boolean(True))),
@@ -143,6 +150,10 @@ pub fn error_handling_test() {
       Ok(object.ErrorObj("addition not supported: BOOLEAN + BOOLEAN")),
     ),
     #(
+      "\"Hello\" - \"World!\"",
+      Ok(object.ErrorObj("substraction not supported: STRING - STRING")),
+    ),
+    #(
       "if (10 > 1) {
         if (10 > 1) {
           return true + false;
@@ -152,6 +163,10 @@ pub fn error_handling_test() {
       Ok(object.ErrorObj("addition not supported: BOOLEAN + BOOLEAN")),
     ),
     #("foobar", Ok(object.ErrorObj("identifier not found: foobar"))),
+    #(
+      "{\"name\": \"Monkey\"}[fn(x){ x }];",
+      Ok(object.ErrorObj("FUNCTION cannot be used as a hash key.")),
+    ),
   ]
 
   tests
@@ -212,6 +227,216 @@ pub fn function_application_test() {
       "let newAdder = fn(x) { fn(y) { x + y }; }; let addTwo = newAdder(2); addTwo(2);",
       Ok(object.Integer(4)),
     ),
+  ]
+
+  tests
+  |> list.each(test_pair)
+}
+
+pub fn string_concatenation_test() {
+  let tests = [
+    #("\"Hello\" + \" \" + \"World!\"", Ok(object.String("Hello World!"))),
+  ]
+
+  tests
+  |> list.each(test_pair)
+}
+
+pub fn builtin_functions_test() {
+  let tests = [
+    #("len(\"\")", Ok(object.Integer(0))),
+    #("len(\"four\")", Ok(object.Integer(4))),
+    #("len(\"hello world\")", Ok(object.Integer(11))),
+    #("len([1, 2, 3])", Ok(object.Integer(3))),
+    #(
+      "len(1)",
+      Ok(object.ErrorObj("Argument to 'len' not supported, got INTEGER")),
+    ),
+    #(
+      "len(\"one\", \"two\")",
+      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+    ),
+    #("first([1,2,3])", Ok(object.Integer(1))),
+    #("first([\"1\", 2, 3])", Ok(object.String("1"))),
+    #("first([])", Ok(object.ErrorObj("List is empty."))),
+    #(
+      "first(1)",
+      Ok(object.ErrorObj("Argument to 'first' not supported, got INTEGER")),
+    ),
+    #(
+      "first([1,2,3],[4,5,6])",
+      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+    ),
+    #("last([1,2,3])", Ok(object.Integer(3))),
+    #("last([\"1\", 2, 3])", Ok(object.Integer(3))),
+    #("last([])", Ok(object.ErrorObj("List is empty."))),
+    #(
+      "last(1)",
+      Ok(object.ErrorObj("Argument to 'last' not supported, got INTEGER")),
+    ),
+    #(
+      "last([1,2,3],[4,5,6])",
+      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+    ),
+    #("rest([1,2,3])", Ok(object.Array([object.Integer(2), object.Integer(3)]))),
+    #(
+      "rest([\"1\", \"2\", 3])",
+      Ok(object.Array([object.String("2"), object.Integer(3)])),
+    ),
+    #("rest([])", Ok(object.ErrorObj("List is empty."))),
+    #(
+      "rest(1)",
+      Ok(object.ErrorObj("Argument to 'rest' not supported, got INTEGER")),
+    ),
+    #(
+      "rest([1,2,3],[4,5,6])",
+      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+    ),
+    #(
+      "push([1,2,3], 4)",
+      Ok(
+        object.Array([
+          object.Integer(1),
+          object.Integer(2),
+          object.Integer(3),
+          object.Integer(4),
+        ]),
+      ),
+    ),
+    #(
+      "push([\"1\", \"2\", 3], \"4\")",
+      Ok(
+        object.Array([
+          object.String("1"),
+          object.String("2"),
+          object.Integer(3),
+          object.String("4"),
+        ]),
+      ),
+    ),
+    #("push([], 1)", Ok(object.Array([object.Integer(1)]))),
+    #(
+      "push([], [1,2,3])",
+      Ok(
+        object.Array([
+          object.Array([object.Integer(1), object.Integer(2), object.Integer(3)]),
+        ]),
+      ),
+    ),
+    #(
+      "push(1, 1)",
+      Ok(object.ErrorObj("Argument to 'push' not supported, got INTEGER")),
+    ),
+    #(
+      "push([])",
+      Ok(object.ErrorObj("Wrong number of arguments. got: 1, expected: 2")),
+    ),
+    #(
+      "push([1,2,3], 2, 3)",
+      Ok(object.ErrorObj("Wrong number of arguments. got: 3, expected: 2")),
+    ),
+  ]
+
+  tests
+  |> list.each(test_pair)
+}
+
+pub fn array_literal_test() {
+  let tests = [
+    #(
+      "[1, 2 * 2, 3 + 3]",
+      Ok(
+        object.Array(elements: [
+          object.Integer(1),
+          object.Integer(4),
+          object.Integer(6),
+        ]),
+      ),
+    ),
+  ]
+
+  tests
+  |> list.each(test_pair)
+}
+
+pub fn array_index_expressions_test() {
+  let tests = [
+    #("[1, 2, 3][0]", Ok(object.Integer(1))),
+    #("[1, 2, 3][1]", Ok(object.Integer(2))),
+    #("[1, 2, 3][2]", Ok(object.Integer(3))),
+    #("let i = 0; [1][i];", Ok(object.Integer(1))),
+    #("[1, 2, 3][1 + 1];", Ok(object.Integer(3))),
+    #("let myArray = [1, 2, 3]; myArray[2];", Ok(object.Integer(3))),
+    #(
+      "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+      Ok(object.Integer(6)),
+    ),
+    #(
+      "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i];",
+      Ok(object.Integer(2)),
+    ),
+    #("[1, 2, 3][3]", Ok(object.null)),
+    #("[1, 2, 3][-1]", Ok(object.null)),
+  ]
+
+  tests
+  |> list.each(test_pair)
+}
+
+pub fn hash_literals_test() {
+  let tests = [
+    #(
+      "let two = \"two\"; {\"one\": 10 - 9, two: 1 + 1, \"thr\" + \"ee\": 6 / 2, 4: 4, true: 5, false: 6}",
+      Ok(
+        object.Hash(pairs: [
+          #(
+            object.HashKey(key_type: object.string_obj, value: "one"),
+            object.HashPair(key: object.String("one"), value: object.Integer(1)),
+          ),
+          #(
+            object.HashKey(key_type: object.string_obj, value: "two"),
+            object.HashPair(key: object.String("two"), value: object.Integer(2)),
+          ),
+          #(
+            object.HashKey(key_type: object.string_obj, value: "three"),
+            object.HashPair(
+              key: object.String("three"),
+              value: object.Integer(3),
+            ),
+          ),
+          #(
+            object.HashKey(key_type: object.integer_obj, value: "4"),
+            object.HashPair(key: object.Integer(4), value: object.Integer(4)),
+          ),
+          #(
+            object.HashKey(key_type: object.boolean_obj, value: "true"),
+            object.HashPair(key: object.Boolean(True), value: object.Integer(5)),
+          ),
+          #(
+            object.HashKey(key_type: object.boolean_obj, value: "false"),
+            object.HashPair(
+              key: object.Boolean(False),
+              value: object.Integer(6),
+            ),
+          ),
+        ]),
+      ),
+    ),
+  ]
+
+  tests
+  |> list.each(test_pair)
+}
+
+pub fn hash_index_expression_test() {
+  let tests = [
+    #("{\"foo\": 5}[\"foo\"]", Ok(object.Integer(5))),
+    #("{\"foo\": 5}[\"bar\"]", Ok(object.ErrorObj("Key not found."))),
+    #("let key = \"foo\"; {\"foo\": 5}[key]", Ok(object.Integer(5))),
+    #("{}[\"foo\"]", Ok(object.ErrorObj("Key not found."))),
+    #("{5: 5}[5]", Ok(object.Integer(5))),
+    #("{true: 5}[true]", Ok(object.Integer(5))),
+    #("{false: 5}[false]", Ok(object.Integer(5))),
   ]
 
   tests

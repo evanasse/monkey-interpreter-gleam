@@ -1,4 +1,5 @@
 import gleam/erlang
+import gleam/io
 import gleam/result
 import monkey/ast
 import monkey/lexer
@@ -15,13 +16,13 @@ pub type ReplError {
   EvalError(object.EvalError)
 }
 
-pub fn repl(env: Environment) -> Result(String, ReplError) {
+pub fn repl(env: Environment) -> Result(#(String, Environment), ReplError) {
   use user_input <- result.try(read_line())
   use tokens <- result.try(lex(user_input))
   use program <- result.try(parse(tokens))
-  use object <- result.try(eval(program, env))
+  use #(object, env) <- result.try(eval(program, env))
 
-  Ok(object.inspect(object))
+  Ok(#(object.inspect(object), env))
 }
 
 fn read_line() -> Result(String, ReplError) {
@@ -48,9 +49,9 @@ fn parse(tokens: List(token.Token)) -> Result(ast.Node(ast.Program), ReplError) 
 fn eval(
   program: ast.Node(ast.Program),
   env: Environment,
-) -> Result(object.Object, ReplError) {
+) -> Result(#(object.Object, Environment), ReplError) {
   case object.eval(program, env) {
-    Ok(#(object, _)) -> Ok(object)
+    Ok(#(object, env)) -> Ok(#(object, env))
     Error(e) -> Error(EvalError(e))
   }
 }

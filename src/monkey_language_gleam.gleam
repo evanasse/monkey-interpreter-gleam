@@ -8,7 +8,7 @@ pub fn main() {
 
 fn main_loop(env: Environment) {
   case repl.repl(env) {
-    Ok(output) -> {
+    Ok(#(output, env)) -> {
       io.println(output)
       main_loop(env)
     }

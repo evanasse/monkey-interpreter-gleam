@@ -119,6 +119,27 @@ pub fn integer_literal_expression_test() {
   |> should.equal(expected_program)
 }
 
+pub fn string_literal_expression_test() {
+  let input = "\"hello world\";"
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.String("hello world"),
+        expression: ast.StringLiteral(
+          token.String("hello world"),
+          "hello world",
+        ),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
 pub fn prefix_expression_test() {
   let input =
     "
@@ -328,6 +349,11 @@ pub fn operator_precedence_parsing_test() {
       "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
     ),
     #("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"),
+    #("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"),
+    #(
+      "add(a * b[2], b[1], 2 * [1, 2][1])",
+      "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+    ),
   ]
 
   tests
@@ -559,6 +585,246 @@ add(1, 2 * 3, 4 + 5);
             ),
           ],
         ),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_array_literal_test() {
+  let input =
+    "
+[1, 2 * 3, 4 + 5];
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_bracket,
+        expression: ast.ArrayLiteral(token: token.l_bracket, elements: [
+          ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+          ast.InfixExpression(
+            token: token.asterisk,
+            left: ast.IntegerLiteral(token: token.Integer("2"), value: 2),
+            operator: token.asterisk.literal,
+            right: ast.IntegerLiteral(token: token.Integer("3"), value: 3),
+          ),
+          ast.InfixExpression(
+            token: token.plus,
+            left: ast.IntegerLiteral(token: token.Integer("4"), value: 4),
+            operator: token.plus.literal,
+            right: ast.IntegerLiteral(token: token.Integer("5"), value: 5),
+          ),
+        ]),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_index_expression_test() {
+  let input =
+    "
+myArray[1 + 1]
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_bracket,
+        expression: ast.IndexExpression(
+          token: token.l_bracket,
+          left: ast.Identifier(token.Identifier("myArray"), "myArray"),
+          index: ast.InfixExpression(
+            token: token.plus,
+            left: ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+            operator: token.plus.literal,
+            right: ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+          ),
+        ),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_hash_literal_string_keys_test() {
+  let input =
+    "
+{\"one\": 1, \"two\": 2, \"three\": 3}
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_brace,
+        expression: ast.HashLiteral(token: token.l_brace, pairs: [
+          #(
+            ast.StringLiteral(token: token.String("one"), value: "one"),
+            ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+          ),
+          #(
+            ast.StringLiteral(token: token.String("two"), value: "two"),
+            ast.IntegerLiteral(token: token.Integer("2"), value: 2),
+          ),
+          #(
+            ast.StringLiteral(token: token.String("three"), value: "three"),
+            ast.IntegerLiteral(token: token.Integer("3"), value: 3),
+          ),
+        ]),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_hash_literal_integer_keys_test() {
+  let input =
+    "
+{1: 1, 2: 2, 3: 3}
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_brace,
+        expression: ast.HashLiteral(token: token.l_brace, pairs: [
+          #(
+            ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+            ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+          ),
+          #(
+            ast.IntegerLiteral(token: token.Integer("2"), value: 2),
+            ast.IntegerLiteral(token: token.Integer("2"), value: 2),
+          ),
+          #(
+            ast.IntegerLiteral(token: token.Integer("3"), value: 3),
+            ast.IntegerLiteral(token: token.Integer("3"), value: 3),
+          ),
+        ]),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_hash_literal_boolean_keys_test() {
+  let input =
+    "
+{true: 1, false: 2}
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_brace,
+        expression: ast.HashLiteral(token: token.l_brace, pairs: [
+          #(
+            ast.Boolean(token: token.true, value: True),
+            ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+          ),
+          #(
+            ast.Boolean(token: token.false, value: False),
+            ast.IntegerLiteral(token: token.Integer("2"), value: 2),
+          ),
+        ]),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_empty_hash_literal_test() {
+  let input =
+    "
+{}
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_brace,
+        expression: ast.HashLiteral(token: token.l_brace, pairs: []),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}
+
+pub fn parse_hash_literal_with_expressions_test() {
+  let input =
+    "
+{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.l_brace,
+        expression: ast.HashLiteral(token: token.l_brace, pairs: [
+          #(
+            ast.StringLiteral(token: token.String("one"), value: "one"),
+            ast.InfixExpression(
+              token: token.plus,
+              left: ast.IntegerLiteral(token: token.Integer("0"), value: 0),
+              operator: token.plus.literal,
+              right: ast.IntegerLiteral(token: token.Integer("1"), value: 1),
+            ),
+          ),
+          #(
+            ast.StringLiteral(token: token.String("two"), value: "two"),
+            ast.InfixExpression(
+              token: token.minus,
+              left: ast.IntegerLiteral(token: token.Integer("10"), value: 10),
+              operator: token.minus.literal,
+              right: ast.IntegerLiteral(token: token.Integer("8"), value: 8),
+            ),
+          ),
+          #(
+            ast.StringLiteral(token: token.String("three"), value: "three"),
+            ast.InfixExpression(
+              token: token.slash,
+              left: ast.IntegerLiteral(token: token.Integer("15"), value: 15),
+              operator: token.slash.literal,
+              right: ast.IntegerLiteral(token: token.Integer("5"), value: 5),
+            ),
+          ),
+        ]),
       ),
     ])
 
