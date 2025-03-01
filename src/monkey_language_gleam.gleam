@@ -1,4 +1,5 @@
 import gleam/io
+import monkey/eval
 import monkey/object.{type Environment, new_env}
 import monkey/repl
 
@@ -15,6 +16,10 @@ fn main_loop(env: Environment) {
     Error(e) -> {
       case e {
         repl.ReadingError(_) -> Nil
+        repl.EvalError(e) -> {
+          eval.to_string(e) |> io.println
+          main_loop(env)
+        }
         _ -> {
           io.debug(e)
           main_loop(env)

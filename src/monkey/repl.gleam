@@ -1,7 +1,7 @@
 import gleam/erlang
-import gleam/io
 import gleam/result
 import monkey/ast
+import monkey/eval
 import monkey/lexer
 import monkey/object.{type Environment}
 import monkey/parser
@@ -13,7 +13,7 @@ pub type ReplError {
   ReadingError(erlang.GetLineError)
   LexingError(lexer.LexingError)
   ParsingError(parser.ParserError)
-  EvalError(object.EvalError)
+  EvalError(eval.EvalError)
 }
 
 pub fn repl(env: Environment) -> Result(#(String, Environment), ReplError) {
@@ -50,7 +50,7 @@ fn eval(
   program: ast.Node(ast.Program),
   env: Environment,
 ) -> Result(#(object.Object, Environment), ReplError) {
-  case object.eval(program, env) {
+  case eval.eval(program, env) {
     Ok(#(object, env)) -> Ok(#(object, env))
     Error(e) -> Error(EvalError(e))
   }

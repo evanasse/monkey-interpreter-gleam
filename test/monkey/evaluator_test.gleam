@@ -1,9 +1,9 @@
-import gleam/dict
 import gleam/list
 import gleeunit/should
 import monkey/ast
+import monkey/eval.{type EvalError, eval}
 import monkey/lexer
-import monkey/object.{type Environment, type EvalError, type Object, eval}
+import monkey/object.{type Environment, type Object}
 import monkey/parser
 import monkey/token
 
@@ -14,9 +14,12 @@ fn eval_program(input: String) -> Result(#(Object, Environment), EvalError) {
 }
 
 fn test_pair(t: #(String, Result(Object, EvalError))) {
-  let assert Ok(expected_object) = t.1
-  let assert Ok(evaluated_tuple) = eval_program(t.0)
-  evaluated_tuple.0 |> should.equal(expected_object)
+  let expected_result = t.1
+  let evaluated_program = eval_program(t.0)
+  case evaluated_program {
+    Ok(#(object, _env)) -> Ok(object) |> should.equal(expected_result)
+    Error(e) -> Error(e) |> should.equal(expected_result)
+  }
 }
 
 pub fn eval_integer_expression_test() {
@@ -128,30 +131,21 @@ pub fn return_statement_test() {
 
 pub fn error_handling_test() {
   let tests = [
-    #(
-      "5 + true;",
-      Ok(object.ErrorObj("addition not supported: INTEGER + BOOLEAN")),
-    ),
-    #(
-      "5 + true; 5;",
-      Ok(object.ErrorObj("addition not supported: INTEGER + BOOLEAN")),
-    ),
-    #("-true", Ok(object.ErrorObj("unknown operator: -BOOLEAN"))),
-    #(
-      "true + false;",
-      Ok(object.ErrorObj("addition not supported: BOOLEAN + BOOLEAN")),
-    ),
+    #("5 + true;", Error(eval.AdditionNotSupported("INTEGER", "BOOLEAN"))),
+    #("5 + true; 5;", Error(eval.AdditionNotSupported("INTEGER", "BOOLEAN"))),
+    #("-true", Error(eval.UnknownPrefixOperator("-", "BOOLEAN"))),
+    #("true + false;", Error(eval.AdditionNotSupported("BOOLEAN", "BOOLEAN"))),
     #(
       "5; true + false; 5",
-      Ok(object.ErrorObj("addition not supported: BOOLEAN + BOOLEAN")),
+      Error(eval.AdditionNotSupported("BOOLEAN", "BOOLEAN")),
     ),
     #(
       "if (10 > 1) { true + false; }",
-      Ok(object.ErrorObj("addition not supported: BOOLEAN + BOOLEAN")),
+      Error(eval.AdditionNotSupported("BOOLEAN", "BOOLEAN")),
     ),
     #(
       "\"Hello\" - \"World!\"",
-      Ok(object.ErrorObj("substraction not supported: STRING - STRING")),
+      Error(eval.SubstractionNotSupported("STRING", "STRING")),
     ),
     #(
       "if (10 > 1) {
@@ -160,12 +154,12 @@ pub fn error_handling_test() {
         }
         return 1;
       }",
-      Ok(object.ErrorObj("addition not supported: BOOLEAN + BOOLEAN")),
+      Error(eval.AdditionNotSupported("BOOLEAN", "BOOLEAN")),
     ),
-    #("foobar", Ok(object.ErrorObj("identifier not found: foobar"))),
+    #("foobar", Error(eval.IdentifierNotFound("foobar"))),
     #(
       "{\"name\": \"Monkey\"}[fn(x){ x }];",
-      Ok(object.ErrorObj("FUNCTION cannot be used as a hash key.")),
+      Error(eval.TypeNotSupportedAsHashKey("FUNCTION")),
     ),
   ]
 
@@ -248,49 +242,37 @@ pub fn builtin_functions_test() {
     #("len(\"four\")", Ok(object.Integer(4))),
     #("len(\"hello world\")", Ok(object.Integer(11))),
     #("len([1, 2, 3])", Ok(object.Integer(3))),
-    #(
-      "len(1)",
-      Ok(object.ErrorObj("Argument to 'len' not supported, got INTEGER")),
-    ),
+    #("len(1)", Error(eval.ArgumentNotSupported("len", "INTEGER"))),
     #(
       "len(\"one\", \"two\")",
-      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+      Error(eval.WrongNumberOfArguments(expected: 1, got: 2)),
     ),
     #("first([1,2,3])", Ok(object.Integer(1))),
     #("first([\"1\", 2, 3])", Ok(object.String("1"))),
-    #("first([])", Ok(object.ErrorObj("List is empty."))),
-    #(
-      "first(1)",
-      Ok(object.ErrorObj("Argument to 'first' not supported, got INTEGER")),
-    ),
+    #("first([])", Error(eval.ListIsEmpty)),
+    #("first(1)", Error(eval.ArgumentNotSupported("first", "INTEGER"))),
     #(
       "first([1,2,3],[4,5,6])",
-      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+      Error(eval.WrongNumberOfArguments(expected: 1, got: 2)),
     ),
     #("last([1,2,3])", Ok(object.Integer(3))),
     #("last([\"1\", 2, 3])", Ok(object.Integer(3))),
-    #("last([])", Ok(object.ErrorObj("List is empty."))),
-    #(
-      "last(1)",
-      Ok(object.ErrorObj("Argument to 'last' not supported, got INTEGER")),
-    ),
+    #("last([])", Error(eval.ListIsEmpty)),
+    #("last(1)", Error(eval.ArgumentNotSupported("last", "INTEGER"))),
     #(
       "last([1,2,3],[4,5,6])",
-      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+      Error(eval.WrongNumberOfArguments(expected: 1, got: 2)),
     ),
     #("rest([1,2,3])", Ok(object.Array([object.Integer(2), object.Integer(3)]))),
     #(
       "rest([\"1\", \"2\", 3])",
       Ok(object.Array([object.String("2"), object.Integer(3)])),
     ),
-    #("rest([])", Ok(object.ErrorObj("List is empty."))),
-    #(
-      "rest(1)",
-      Ok(object.ErrorObj("Argument to 'rest' not supported, got INTEGER")),
-    ),
+    #("rest([])", Error(eval.ListIsEmpty)),
+    #("rest(1)", Error(eval.ArgumentNotSupported("rest", "INTEGER"))),
     #(
       "rest([1,2,3],[4,5,6])",
-      Ok(object.ErrorObj("Wrong number of arguments. got: 2, expected: 1")),
+      Error(eval.WrongNumberOfArguments(expected: 1, got: 2)),
     ),
     #(
       "push([1,2,3], 4)",
@@ -323,17 +305,11 @@ pub fn builtin_functions_test() {
         ]),
       ),
     ),
-    #(
-      "push(1, 1)",
-      Ok(object.ErrorObj("Argument to 'push' not supported, got INTEGER")),
-    ),
-    #(
-      "push([])",
-      Ok(object.ErrorObj("Wrong number of arguments. got: 1, expected: 2")),
-    ),
+    #("push(1, 1)", Error(eval.ArgumentNotSupported("push", "INTEGER"))),
+    #("push([])", Error(eval.WrongNumberOfArguments(expected: 2, got: 1))),
     #(
       "push([1,2,3], 2, 3)",
-      Ok(object.ErrorObj("Wrong number of arguments. got: 3, expected: 2")),
+      Error(eval.WrongNumberOfArguments(expected: 2, got: 3)),
     ),
   ]
 
@@ -431,9 +407,9 @@ pub fn hash_literals_test() {
 pub fn hash_index_expression_test() {
   let tests = [
     #("{\"foo\": 5}[\"foo\"]", Ok(object.Integer(5))),
-    #("{\"foo\": 5}[\"bar\"]", Ok(object.ErrorObj("Key not found."))),
+    #("{\"foo\": 5}[\"bar\"]", Error(eval.KeyNotFound("bar"))),
     #("let key = \"foo\"; {\"foo\": 5}[key]", Ok(object.Integer(5))),
-    #("{}[\"foo\"]", Ok(object.ErrorObj("Key not found."))),
+    #("{}[\"foo\"]", Error(eval.KeyNotFound("foo"))),
     #("{5: 5}[5]", Ok(object.Integer(5))),
     #("{true: 5}[true]", Ok(object.Integer(5))),
     #("{false: 5}[false]", Ok(object.Integer(5))),
