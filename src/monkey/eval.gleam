@@ -106,16 +106,11 @@ fn operation_not_supported(
   operation <> " not supported between " <> left <> " and " <> right
 }
 
-pub fn eval(
-  node: ast.Node(t),
+fn eval_expression(
+  expression: ast.Expression,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
-  case node {
-    ast.Program(_, statements) -> eval_program(statements, env)
-    ast.ExpressionStatement(_, expression) -> eval_expression(expression, env)
-    ast.ReturnStatement(_, expression) -> eval_return_statement(expression, env)
-    ast.BlockStatement(_, statements) -> eval_block_statement(statements, env)
-    ast.LetStatement(_, name, value) -> eval_let_statement(name, value, env)
+  case expression {
     ast.PrefixExpression(_, operator, right) ->
       eval_prefix_expression(operator, right, env)
     ast.InfixExpression(_, left, operator, right) ->
@@ -124,7 +119,7 @@ pub fn eval(
       eval_if_expression(condition, consequence, alternative, env)
     ast.IntegerLiteral(_, value) -> Ok(#(Integer(value), env))
     ast.StringLiteral(_, value) -> Ok(#(String(value), env))
-    ast.Boolean(_, value) -> native_bool_to_boolean_object(value, env)
+    ast.BooleanLiteral(_, value) -> native_bool_to_boolean_object(value, env)
     ast.Identifier(_, name) -> eval_identifier(name, env)
     ast.FunctionLiteral(_, parameters, body) ->
       eval_function(parameters, body, env)
@@ -137,25 +132,23 @@ pub fn eval(
   }
 }
 
-fn eval_expression(
-  expression: ast.Node(ast.Expression),
-  env: Environment,
-) -> Result(#(Object, Environment), EvalError) {
-  eval(expression, env)
-}
-
 fn eval_statement(
-  statement: ast.Node(ast.Statement),
+  statement: ast.Statement,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
-  eval(statement, env)
+  case statement {
+    ast.ExpressionStatement(_, expression) -> eval_expression(expression, env)
+    ast.ReturnStatement(_, expression) -> eval_return_statement(expression, env)
+    ast.BlockStatement(_, statements) -> eval_block_statement(statements, env)
+    ast.LetStatement(_, name, value) -> eval_let_statement(name, value, env)
+  }
 }
 
-fn eval_program(
-  statements: List(ast.Node(ast.Statement)),
+pub fn eval_program(
+  program: ast.Program,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
-  statements
+  program.statements
   |> list.fold_until(Ok(#(object.null, env)), fn(acc, statement) {
     case acc {
       Ok(#(_, env)) -> {
@@ -176,7 +169,7 @@ fn eval_program(
 
 fn eval_prefix_expression(
   operator: String,
-  right: ast.Node(ast.Expression),
+  right: ast.Expression,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(right, env) <- result.try(eval_expression(right, env))
@@ -193,9 +186,9 @@ fn eval_prefix_expression(
 }
 
 fn eval_infix_expression(
-  left: ast.Node(ast.Expression),
+  left: ast.Expression,
   operator: String,
-  right: ast.Node(ast.Expression),
+  right: ast.Expression,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(left, env) <- result.try(eval_expression(left, env))
@@ -220,7 +213,7 @@ fn eval_infix_expression(
 }
 
 fn eval_block_statement(
-  statements: List(ast.Node(ast.Statement)),
+  statements: List(ast.Statement),
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   statements
@@ -243,7 +236,7 @@ fn eval_block_statement(
 }
 
 fn eval_return_statement(
-  expression: ast.Node(ast.Expression),
+  expression: ast.Expression,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(return_value, env) <- result.try(eval_expression(expression, env))
@@ -252,7 +245,7 @@ fn eval_return_statement(
 }
 
 fn eval_expression_list(
-  expressions: List(ast.Node(ast.Expression)),
+  expressions: List(ast.Expression),
   env: Environment,
 ) -> Result(List(Object), EvalError) {
   let list_eval =
@@ -272,8 +265,8 @@ fn eval_expression_list(
 }
 
 fn eval_call_expression(
-  function: ast.Node(ast.Expression),
-  arguments: List(ast.Node(ast.Expression)),
+  function: ast.Expression,
+  arguments: List(ast.Expression),
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(function, env) <- result.try(eval_expression(function, env))
@@ -282,7 +275,7 @@ fn eval_call_expression(
     Function(_, body, _function_env) -> {
       use args <- result.try(eval_expression_list(arguments, env))
       use extended_env <- result.try(extend_function_env(function, args))
-      use #(evaluated, _) <- result.try(eval(body, extended_env))
+      use #(evaluated, _) <- result.try(eval_statement(body, extended_env))
       Ok(#(unwrap_return_value(evaluated), env))
     }
     BuiltinFunction(func) -> {
@@ -336,9 +329,9 @@ fn unwrap_return_value(obj: Object) -> Object {
 }
 
 fn eval_if_expression(
-  condition: ast.Node(ast.Expression),
-  consequence: ast.Node(ast.Statement),
-  alternative: Option(ast.Node(ast.Statement)),
+  condition: ast.Expression,
+  consequence: ast.Statement,
+  alternative: Option(ast.Statement),
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(condition, env) <- result.try(eval_expression(condition, env))
@@ -346,12 +339,12 @@ fn eval_if_expression(
   case condition {
     Null | Boolean(_) if condition == object.false -> {
       case alternative {
-        Some(block_statement) -> eval(block_statement, env)
+        Some(block_statement) -> eval_statement(block_statement, env)
         None -> Ok(#(object.null, env))
       }
     }
     _ -> {
-      eval(consequence, env)
+      eval_statement(consequence, env)
     }
   }
 }
@@ -371,16 +364,16 @@ fn eval_identifier(
 }
 
 fn eval_function(
-  parameters: List(ast.Node(ast.Expression)),
-  body: ast.Node(ast.Statement),
+  parameters: List(ast.Expression),
+  body: ast.Statement,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   Ok(#(Function(parameters, body, env), env))
 }
 
 fn eval_let_statement(
-  name: ast.Node(ast.Expression),
-  value: ast.Node(ast.Expression),
+  name: ast.Expression,
+  value: ast.Expression,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(value, env) <- result.try(eval_expression(value, env))
@@ -542,7 +535,7 @@ fn eval_greater_than(
 }
 
 fn eval_array_literal(
-  elements: List(ast.Node(ast.Expression)),
+  elements: List(ast.Expression),
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use elements <- result.try(eval_expression_list(elements, env))
@@ -551,8 +544,8 @@ fn eval_array_literal(
 }
 
 fn eval_index_expression(
-  left: ast.Node(ast.Expression),
-  index: ast.Node(ast.Expression),
+  left: ast.Expression,
+  index: ast.Expression,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   use #(left, env) <- result.try(eval_expression(left, env))
@@ -560,50 +553,65 @@ fn eval_index_expression(
 
   case left {
     Array(elements) -> {
-      case index {
-        Integer(i) -> {
-          case i < list.length(elements) {
-            True if i < 0 -> Ok(#(object.null, env))
-            True -> {
-              let element = elements |> list.take(i + 1) |> list.last
-              case element {
-                Ok(e) -> Ok(#(e, env))
-                Error(_) -> Error(Impossible)
-              }
-            }
-            False -> Ok(#(object.null, env))
-          }
-        }
-        _ -> Error(TypeNotSupportedAsIndex(object_type: object.get_type(index)))
-      }
+      eval_array_index(elements, index, env)
     }
     Hash(pairs) -> {
-      case object.hash_key(index) {
-        Ok(hashkey) -> {
-          case dict.get(dict.from_list(pairs), hashkey) {
-            Ok(hash_pair) -> Ok(#(hash_pair.value, env))
-            Error(_) -> Error(KeyNotFound(object.inspect(index)))
-          }
-        }
-        Error(_) ->
-          Error(TypeNotSupportedAsHashKey(object_type: object.get_type(index)))
-      }
+      eval_hash_index(pairs, index, env)
     }
     _ -> Error(IndexingNotSupported(left: object.get_type(left)))
   }
 }
 
+fn eval_array_index(
+  elements: List(Object),
+  index: Object,
+  env: Environment,
+) -> Result(#(Object, Environment), EvalError) {
+  case index {
+    Integer(i) -> {
+      case i < list.length(elements) {
+        True if i < 0 -> Ok(#(object.null, env))
+        True -> {
+          let element = elements |> list.take(i + 1) |> list.last
+          case element {
+            Ok(e) -> Ok(#(e, env))
+            Error(_) -> Error(Impossible)
+          }
+        }
+        False -> Ok(#(object.null, env))
+      }
+    }
+    _ -> Error(TypeNotSupportedAsIndex(object_type: object.get_type(index)))
+  }
+}
+
+fn eval_hash_index(
+  pairs: List(#(HashKey, HashPair)),
+  index: Object,
+  env: Environment,
+) -> Result(#(Object, Environment), EvalError) {
+  case object.hash_key(index) {
+    Ok(hashkey) -> {
+      case dict.get(dict.from_list(pairs), hashkey) {
+        Ok(hash_pair) -> Ok(#(hash_pair.value, env))
+        Error(_) -> Error(KeyNotFound(object.inspect(index)))
+      }
+    }
+    Error(_) ->
+      Error(TypeNotSupportedAsHashKey(object_type: object.get_type(index)))
+  }
+}
+
 fn eval_hash_literal(
-  pairs: List(#(ast.Node(ast.Expression), ast.Node(ast.Expression))),
+  pairs: List(#(ast.Expression, ast.Expression)),
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
   let evaluated_pairs =
     pairs
-    |> list.fold_until(Ok(#([], env)), fn(acc, pair) {
-      let acc = result.unwrap(acc, #([], env))
+    |> list.try_fold(#([], env), fn(acc, pair) {
       case eval_hash_pair(pair, env) {
-        Ok(#(p, env)) -> Continue(Ok(#([#(p.0, p.1), ..acc.0], env)))
-        Error(e) -> Stop(Error(e))
+        Ok(#(pair, env)) -> Ok(#([#(pair.0, pair.1), ..acc.0], env))
+        Error(e) -> Error(e)
       }
     })
 
@@ -614,7 +622,7 @@ fn eval_hash_literal(
 }
 
 fn eval_hash_pair(
-  pair: #(ast.Node(ast.Expression), ast.Node(ast.Expression)),
+  pair: #(ast.Expression, ast.Expression),
   env: Environment,
 ) -> Result(#(#(HashKey, HashPair), Environment), EvalError) {
   use #(key, env) <- result.try(eval_expression(pair.0, env))
@@ -622,7 +630,7 @@ fn eval_hash_pair(
     String(_) | Integer(_) | Boolean(_) -> {
       use #(value, env) <- result.try(eval_expression(pair.1, env))
       case object.hash_key(key) {
-        Ok(hk) -> Ok(#(#(hk, HashPair(key, value)), env))
+        Ok(hash_key) -> Ok(#(#(hash_key, HashPair(key, value)), env))
         Error(e) -> {
           case e {
             object.TypeNotSupportedAsHashKey(object_type) ->

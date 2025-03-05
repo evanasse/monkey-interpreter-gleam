@@ -1,4 +1,3 @@
-import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
 import gleeunit/should
@@ -29,7 +28,7 @@ let foobar = y;
       ast.LetStatement(
         token: token.let_,
         name: ast.Identifier(token.Identifier("y"), "y"),
-        value: ast.Boolean(token: token.true, value: True),
+        value: ast.BooleanLiteral(token: token.true, value: True),
       ),
       ast.LetStatement(
         token: token.let_,
@@ -62,7 +61,7 @@ return y;
       ),
       ast.ReturnStatement(
         token: token.return,
-        return_value: ast.Boolean(token: token.true, value: True),
+        return_value: ast.BooleanLiteral(token: token.true, value: True),
       ),
       ast.ReturnStatement(
         token: token.return,
@@ -176,7 +175,7 @@ pub fn prefix_expression_test() {
         expression: ast.PrefixExpression(
           token: token.bang,
           operator: token.bang.literal,
-          right: ast.Boolean(token.true, True),
+          right: ast.BooleanLiteral(token.true, True),
         ),
       ),
       ast.ExpressionStatement(
@@ -184,7 +183,7 @@ pub fn prefix_expression_test() {
         expression: ast.PrefixExpression(
           token: token.bang,
           operator: token.bang.literal,
-          right: ast.Boolean(token.false, False),
+          right: ast.BooleanLiteral(token.false, False),
         ),
       ),
     ])
@@ -291,27 +290,27 @@ false == false;
         token: token.equals,
         expression: ast.InfixExpression(
           token: token.equals,
-          left: ast.Boolean(token.true, True),
+          left: ast.BooleanLiteral(token.true, True),
           operator: token.equals.literal,
-          right: ast.Boolean(token.true, True),
+          right: ast.BooleanLiteral(token.true, True),
         ),
       ),
       ast.ExpressionStatement(
         token: token.not_equals,
         expression: ast.InfixExpression(
           token: token.not_equals,
-          left: ast.Boolean(token.true, True),
+          left: ast.BooleanLiteral(token.true, True),
           operator: token.not_equals.literal,
-          right: ast.Boolean(token.false, False),
+          right: ast.BooleanLiteral(token.false, False),
         ),
       ),
       ast.ExpressionStatement(
         token: token.equals,
         expression: ast.InfixExpression(
           token: token.equals,
-          left: ast.Boolean(token.false, False),
+          left: ast.BooleanLiteral(token.false, False),
           operator: token.equals.literal,
-          right: ast.Boolean(token.false, False),
+          right: ast.BooleanLiteral(token.false, False),
         ),
       ),
     ])
@@ -362,7 +361,7 @@ pub fn operator_precedence_parsing_test() {
 
     let assert Ok(program) = parser.parse(tokens)
 
-    ast.node_to_string(program)
+    ast.program_to_string(program)
     |> should.equal(t.1)
   })
 }
@@ -382,11 +381,11 @@ false;
     ast.Program(token.eof, [
       ast.ExpressionStatement(
         token: token.true,
-        expression: ast.Boolean(token.true, True),
+        expression: ast.BooleanLiteral(token.true, True),
       ),
       ast.ExpressionStatement(
         token: token.false,
-        expression: ast.Boolean(token.false, False),
+        expression: ast.BooleanLiteral(token.false, False),
       ),
     ])
 
@@ -745,11 +744,11 @@ pub fn parse_hash_literal_boolean_keys_test() {
         token: token.l_brace,
         expression: ast.HashLiteral(token: token.l_brace, pairs: [
           #(
-            ast.Boolean(token: token.true, value: True),
+            ast.BooleanLiteral(token: token.true, value: True),
             ast.IntegerLiteral(token: token.Integer("1"), value: 1),
           ),
           #(
-            ast.Boolean(token: token.false, value: False),
+            ast.BooleanLiteral(token: token.false, value: False),
             ast.IntegerLiteral(token: token.Integer("2"), value: 2),
           ),
         ]),

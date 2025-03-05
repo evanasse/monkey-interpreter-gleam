@@ -39,7 +39,7 @@ fn lex(input: String) -> Result(List(token.Token), ReplError) {
   }
 }
 
-fn parse(tokens: List(token.Token)) -> Result(ast.Node(ast.Program), ReplError) {
+fn parse(tokens: List(token.Token)) -> Result(ast.Program, ReplError) {
   case parser.parse(tokens) {
     Ok(program) -> Ok(program)
     Error(e) -> Error(ParsingError(e))
@@ -47,10 +47,10 @@ fn parse(tokens: List(token.Token)) -> Result(ast.Node(ast.Program), ReplError) 
 }
 
 fn eval(
-  program: ast.Node(ast.Program),
+  program: ast.Program,
   env: Environment,
 ) -> Result(#(object.Object, Environment), ReplError) {
-  case eval.eval(program, env) {
+  case eval.eval_program(program, env) {
     Ok(#(object, env)) -> Ok(#(object, env))
     Error(e) -> Error(EvalError(e))
   }

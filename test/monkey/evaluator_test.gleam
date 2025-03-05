@@ -1,7 +1,7 @@
 import gleam/list
 import gleeunit/should
 import monkey/ast
-import monkey/eval.{type EvalError, eval}
+import monkey/eval.{type EvalError}
 import monkey/lexer
 import monkey/object.{type Environment, type Object}
 import monkey/parser
@@ -10,7 +10,7 @@ import monkey/token
 fn eval_program(input: String) -> Result(#(Object, Environment), EvalError) {
   let assert Ok(tokens) = lexer.lex(input)
   let assert Ok(program) = parser.parse(tokens)
-  eval(program, object.new_env())
+  eval.eval_program(program, object.new_env())
 }
 
 fn test_pair(t: #(String, Result(Object, EvalError))) {

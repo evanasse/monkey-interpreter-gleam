@@ -3,71 +3,47 @@ import gleam/option.{type Option, None, Some}
 import gleam/string
 import monkey/token.{type Token}
 
-pub type Node(t) {
-  Program(token: Token, statements: List(Node(Statement)))
-  LetStatement(token: Token, name: Node(Expression), value: Node(Expression))
-  ReturnStatement(token: Token, return_value: Node(Expression))
-  ExpressionStatement(token: Token, expression: Node(Expression))
+pub type Expression {
   Identifier(token: Token, value: String)
   IntegerLiteral(token: Token, value: Int)
   StringLiteral(token: Token, value: String)
-  ArrayLiteral(token: Token, elements: List(Node(Expression)))
-  Boolean(token: Token, value: Bool)
-  PrefixExpression(token: Token, operator: String, right: Node(Expression))
+  ArrayLiteral(token: Token, elements: List(Expression))
+  BooleanLiteral(token: Token, value: Bool)
+  PrefixExpression(token: Token, operator: String, right: Expression)
   InfixExpression(
     token: Token,
-    left: Node(Expression),
+    left: Expression,
     operator: String,
-    right: Node(Expression),
+    right: Expression,
   )
   IfExpression(
     token: Token,
-    condition: Node(Expression),
-    consequence: Node(Statement),
-    alternative: Option(Node(Statement)),
+    condition: Expression,
+    consequence: Statement,
+    alternative: Option(Statement),
   )
-  BlockStatement(token: Token, statements: List(Node(Statement)))
-  FunctionLiteral(
-    token: Token,
-    parameters: List(Node(Expression)),
-    body: Node(Statement),
-  )
+  FunctionLiteral(token: Token, parameters: List(Expression), body: Statement)
   CallExpression(
     token: Token,
-    function: Node(Expression),
-    arguments: List(Node(Expression)),
+    function: Expression,
+    arguments: List(Expression),
   )
-  IndexExpression(token: Token, left: Node(Expression), index: Node(Expression))
-  HashLiteral(token: Token, pairs: List(#(Node(Expression), Node(Expression))))
+  IndexExpression(token: Token, left: Expression, index: Expression)
+  HashLiteral(token: Token, pairs: List(#(Expression, Expression)))
 }
 
-pub type Expression
-
-pub type Statement
-
-pub type Program
-
-pub fn node_to_string(node: Node(t)) -> String {
-  case node {
-    Program(_, statements) -> program_to_string(statements)
-    LetStatement(_, name, value) -> let_statement_to_string(name, value)
-    ReturnStatement(_, return_value) -> return_statement_to_string(return_value)
-    ExpressionStatement(_, expression) ->
-      expression_statement_to_string(expression)
+pub fn expression_to_string(expression: Expression) -> String {
+  case expression {
     Identifier(_, value) -> value
     IntegerLiteral(token, _) -> token.literal
     StringLiteral(token, _) -> token.literal
-    Boolean(token, _) -> token.literal
+    BooleanLiteral(token, _) -> token.literal
     PrefixExpression(_, operator, right) ->
       prefix_expression_to_string(operator, right)
     InfixExpression(_, left, operator, right) ->
       infix_expression_to_string(left, operator, right)
     IfExpression(_, condition, consequence, alternative) ->
       if_expression_to_string(condition, consequence, alternative)
-    BlockStatement(_, statements) ->
-      "{"
-      <> statements |> list.map(statement_to_string) |> string.join("\n")
-      <> "}"
     FunctionLiteral(_, parameters, body) ->
       function_literal_to_string(parameters, body)
     CallExpression(_, function, arguments) ->
@@ -78,24 +54,37 @@ pub fn node_to_string(node: Node(t)) -> String {
   }
 }
 
-fn program_to_string(statements: List(Node(Statement))) -> String {
-  statements
-  |> list.map(node_to_string)
+pub type Statement {
+  LetStatement(token: Token, name: Expression, value: Expression)
+  ReturnStatement(token: Token, return_value: Expression)
+  ExpressionStatement(token: Token, expression: Expression)
+  BlockStatement(token: Token, statements: List(Statement))
+}
+
+pub fn statement_to_string(statement: Statement) -> String {
+  case statement {
+    LetStatement(_, name, value) -> let_statement_to_string(name, value)
+    ReturnStatement(_, return_value) -> return_statement_to_string(return_value)
+    ExpressionStatement(_, expression) ->
+      expression_statement_to_string(expression)
+    BlockStatement(_, statements) ->
+      "{"
+      <> statements |> list.map(statement_to_string) |> string.join("\n")
+      <> "}"
+  }
+}
+
+pub type Program {
+  Program(token: Token, statements: List(Statement))
+}
+
+pub fn program_to_string(program: Program) -> String {
+  program.statements
+  |> list.map(statement_to_string)
   |> string.join("\n")
 }
 
-pub fn expression_to_string(expression: Node(Expression)) -> String {
-  node_to_string(expression)
-}
-
-fn statement_to_string(expression: Node(Statement)) -> String {
-  node_to_string(expression)
-}
-
-fn let_statement_to_string(
-  name: Node(Expression),
-  value: Node(Expression),
-) -> String {
+fn let_statement_to_string(name: Expression, value: Expression) -> String {
   "let"
   <> " "
   <> expression_to_string(name)
@@ -104,25 +93,22 @@ fn let_statement_to_string(
   <> ";"
 }
 
-fn return_statement_to_string(return_value: Node(Expression)) -> String {
+fn return_statement_to_string(return_value: Expression) -> String {
   "return" <> expression_to_string(return_value) <> ";"
 }
 
-fn expression_statement_to_string(expression: Node(Expression)) -> String {
+fn expression_statement_to_string(expression: Expression) -> String {
   expression_to_string(expression)
 }
 
-fn prefix_expression_to_string(
-  operator: String,
-  right: Node(Expression),
-) -> String {
+fn prefix_expression_to_string(operator: String, right: Expression) -> String {
   "(" <> operator <> expression_to_string(right) <> ")"
 }
 
 fn infix_expression_to_string(
-  left: Node(Expression),
+  left: Expression,
   operator: String,
-  right: Node(Expression),
+  right: Expression,
 ) -> String {
   "("
   <> expression_to_string(left)
@@ -134,9 +120,9 @@ fn infix_expression_to_string(
 }
 
 fn if_expression_to_string(
-  condition: Node(Expression),
-  consequence: Node(Statement),
-  alternative: Option(Node(Statement)),
+  condition: Expression,
+  consequence: Statement,
+  alternative: Option(Statement),
 ) -> String {
   "if"
   <> " "
@@ -150,8 +136,8 @@ fn if_expression_to_string(
 }
 
 fn function_literal_to_string(
-  parameters: List(Node(Expression)),
-  body: Node(Statement),
+  parameters: List(Expression),
+  body: Statement,
 ) -> String {
   "fn("
   <> parameters |> list.map(expression_to_string) |> string.join(", ")
@@ -160,8 +146,8 @@ fn function_literal_to_string(
 }
 
 fn call_expression_to_string(
-  function: Node(Expression),
-  arguments: List(Node(Expression)),
+  function: Expression,
+  arguments: List(Expression),
 ) -> String {
   expression_to_string(function)
   <> "("
@@ -169,14 +155,11 @@ fn call_expression_to_string(
   <> ")"
 }
 
-fn array_literal_to_string(elements: List(Node(Expression))) -> String {
+fn array_literal_to_string(elements: List(Expression)) -> String {
   "[" <> elements |> list.map(expression_to_string) |> string.join(", ") <> "]"
 }
 
-fn index_expression_to_string(
-  left: Node(Expression),
-  index: Node(Expression),
-) -> String {
+fn index_expression_to_string(left: Expression, index: Expression) -> String {
   "("
   <> expression_to_string(left)
   <> "["
@@ -184,9 +167,7 @@ fn index_expression_to_string(
   <> "])"
 }
 
-fn hash_literal_to_string(
-  pairs: List(#(Node(Expression), Node(Expression))),
-) -> String {
+fn hash_literal_to_string(pairs: List(#(Expression, Expression))) -> String {
   "{"
   <> pairs
   |> list.map(fn(pair) {

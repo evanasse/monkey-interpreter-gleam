@@ -35,8 +35,8 @@ pub type Object {
   Boolean(value: Bool)
   ReturnValue(value: Object)
   Function(
-    parameters: List(ast.Node(ast.Expression)),
-    body: ast.Node(ast.Statement),
+    parameters: List(ast.Expression),
+    body: ast.Statement,
     env: Environment,
   )
   BuiltinFunction(
@@ -83,7 +83,7 @@ pub fn inspect(object: Object) -> String {
       "fn("
       <> parameters |> list.map(ast.expression_to_string) |> string.join(", ")
       <> ")"
-      <> ast.node_to_string(body)
+      <> ast.statement_to_string(body)
     BuiltinFunction(_) -> "builtin_function"
     Array(elements) ->
       "[" <> elements |> list.map(inspect) |> string.join(", ") <> "]"

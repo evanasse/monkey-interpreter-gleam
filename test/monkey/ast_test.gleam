@@ -13,6 +13,6 @@ pub fn ast_to_string_test() {
     ])
 
   program
-  |> ast.node_to_string
+  |> ast.program_to_string
   |> should.equal("let myVar = anotherVar;")
 }

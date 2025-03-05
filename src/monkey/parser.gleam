@@ -1,11 +1,8 @@
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import monkey/ast.{
-  type Expression, type Node, type Program, type Statement, Program,
-}
+import monkey/ast.{type Expression, type Program, type Statement}
 import monkey/op_precedence.{type OpPrecedence}
 import monkey/token.{type Token}
 
@@ -15,27 +12,27 @@ pub type ParserError {
   NoPrefixFunctionForToken(token: Token)
   NoInfixFunctionForToken(token: Token)
   NotAStatementStartToken(token: Token)
-  UnexpectedExpressionNode(got: Node(Expression))
-  UnexpectedStatementNode(got: Node(Statement))
+  UnexpectedExpressionNode(got: Expression)
+  UnexpectedStatementNode(got: Statement)
   UnexpectedToken(expected_one_of: List(Token), got: Token)
 }
 
 type PrefixParseFunction =
   fn(List(Token), OpPrecedence) ->
-    Result(#(Node(Expression), List(Token)), ParserError)
+    Result(#(Expression, List(Token)), ParserError)
 
 type InfixParseFunction =
-  fn(List(Token), Node(Expression), OpPrecedence) ->
-    Result(#(Node(Expression), List(Token)), ParserError)
+  fn(List(Token), Expression, OpPrecedence) ->
+    Result(#(Expression, List(Token)), ParserError)
 
-pub fn parse(tokens: List(Token)) -> Result(Node(Program), ParserError) {
+pub fn parse(tokens: List(Token)) -> Result(Program, ParserError) {
   parse_loop(tokens, [])
 }
 
 fn parse_loop(
   remaining_tokens: List(Token),
-  program_statements: List(Node(Statement)),
-) -> Result(Node(Program), ParserError) {
+  program_statements: List(Statement),
+) -> Result(Program, ParserError) {
   case remaining_tokens |> next_token {
     Ok(#(next_token, remaining_tokens)) -> {
       case next_token {
@@ -54,7 +51,7 @@ fn parse_loop(
 
 fn parse_statement(
   remaining_tokens: List(Token),
-) -> Result(#(Node(Statement), List(Token)), ParserError) {
+) -> Result(#(Statement, List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
   case next_token {
     token.Let(_) -> parse_let_statement(remaining_tokens)
@@ -65,7 +62,7 @@ fn parse_statement(
 
 fn parse_let_statement(
   remaining_tokens: List(Token),
-) -> Result(#(Node(Statement), List(Token)), ParserError) {
+) -> Result(#(Statement, List(Token)), ParserError) {
   use #(identifier_token, remaining_tokens) <- result.try(
     next_token_is_identifier(remaining_tokens),
   )
@@ -95,7 +92,7 @@ fn parse_let_statement(
 
 fn parse_return_statement(
   remaining_tokens: List(Token),
-) -> Result(#(Node(Statement), List(Token)), ParserError) {
+) -> Result(#(Statement, List(Token)), ParserError) {
   use #(expression, remaining_tokens) <- result.try(parse_expression(
     remaining_tokens,
     op_precedence.lowest,
@@ -111,7 +108,7 @@ fn parse_return_statement(
 
 fn parse_expression_statement(
   remaining_tokens: List(Token),
-) -> Result(#(Node(Statement), List(Token)), ParserError) {
+) -> Result(#(Statement, List(Token)), ParserError) {
   use #(expression, remaining_tokens) <- result.try(parse_expression(
     remaining_tokens,
     op_precedence.lowest,
@@ -125,7 +122,7 @@ fn parse_expression_statement(
 fn parse_expression(
   remaining_tokens: List(Token),
   op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use parse_function <- result.try(next_token_has_prefix_function(
     remaining_tokens,
   ))
@@ -139,10 +136,10 @@ fn parse_expression(
 }
 
 fn parse_infix_expression_loop(
-  left_expression: Node(Expression),
+  left_expression: Expression,
   op_precedence: OpPrecedence,
   remaining_tokens: List(Token),
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
 
   case next_token, op_precedence < token_precedence(next_token) {
@@ -178,7 +175,7 @@ fn parse_infix_expression_loop(
 fn parse_identifier(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(identifier_token, remaining_tokens) <- result.try(
     next_token_is_identifier(remaining_tokens),
   )
@@ -191,7 +188,7 @@ fn parse_identifier(
 fn parse_integer_literal(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(integer_token, integer_value, remaining_tokens) <- result.try(
     next_token_is_integer(remaining_tokens),
   )
@@ -201,7 +198,7 @@ fn parse_integer_literal(
 fn parse_string_literal(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(string_token, string_value, remaining_tokens) <- result.try(
     next_token_is_string(remaining_tokens),
   )
@@ -211,17 +208,17 @@ fn parse_string_literal(
 fn parse_boolean(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(boolean_token, boolean_value, remaining_tokens) <- result.try(
     next_token_is_boolean(remaining_tokens),
   )
-  Ok(#(ast.Boolean(boolean_token, boolean_value), remaining_tokens))
+  Ok(#(ast.BooleanLiteral(boolean_token, boolean_value), remaining_tokens))
 }
 
 fn parse_prefix_expression(
   remaining_tokens: List(Token),
   op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(operator_token, remaining_tokens) <- result.try(
     next_token_is_prefix_operator(remaining_tokens),
   )
@@ -243,9 +240,9 @@ fn parse_prefix_expression(
 
 fn parse_infix_expression(
   remaining_tokens: List(Token),
-  left_expression: Node(Expression),
+  left_expression: Expression,
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(operator_token, remaining_tokens) <- result.try(
     next_token_is_infix_operator(remaining_tokens),
   )
@@ -269,7 +266,7 @@ fn parse_infix_expression(
 fn parse_grouped_expression(
   remaining_tokens: List(Token),
   op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(_, remaining_tokens) <- result.try(next_token(remaining_tokens))
   use #(expression, remaining_tokens) <- result.try(parse_expression(
     remaining_tokens,
@@ -285,7 +282,7 @@ fn parse_grouped_expression(
 fn parse_if_expression(
   remaining_tokens: List(Token),
   op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(if_token, remaining_tokens) <- result.try(next_token_is_if_token(
     remaining_tokens,
   ))
@@ -315,7 +312,7 @@ fn parse_if_expression(
 
 fn parse_block_statement(
   remaining_tokens: List(Token),
-) -> Result(#(Node(Statement), List(Token)), ParserError) {
+) -> Result(#(Statement, List(Token)), ParserError) {
   use #(_, remaining_tokens) <- result.try(next_token_is_left_brace(
     remaining_tokens,
   ))
@@ -324,8 +321,8 @@ fn parse_block_statement(
 
 fn parse_block_statement_loop(
   remaining_tokens: List(Token),
-  statements: List(Node(Statement)),
-) -> Result(#(Node(Statement), List(Token)), ParserError) {
+  statements: List(Statement),
+) -> Result(#(Statement, List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
   case next_token {
     token.RightBrace(_) | token.EOF(_) ->
@@ -345,7 +342,7 @@ fn parse_block_statement_loop(
 fn parse_function_literal(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(function_token, remaining_tokens) <- result.try(
     next_token_is_function_token(remaining_tokens),
   )
@@ -364,7 +361,7 @@ fn parse_function_literal(
 
 fn parse_parameters(
   remaining_tokens: List(Token),
-) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+) -> Result(#(List(Expression), List(Token)), ParserError) {
   use #(_, remaining_tokens) <- result.try(next_token_is_left_parenthesis(
     remaining_tokens,
   ))
@@ -373,8 +370,8 @@ fn parse_parameters(
 
 fn parse_parameters_loop(
   remaining_tokens: List(Token),
-  parameters: List(Node(Expression)),
-) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+  parameters: List(Expression),
+) -> Result(#(List(Expression), List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
   case next_token {
     token.RightParenthesis(_) ->
@@ -393,7 +390,7 @@ fn parse_parameters_loop(
 fn parse_array_literal(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(left_bracket_token, remaining_tokens) <- result.try(
     next_token_is_left_bracket(remaining_tokens),
   )
@@ -405,7 +402,7 @@ fn parse_array_literal(
 
 fn parse_array_elements(
   remaining_tokens: List(Token),
-) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+) -> Result(#(List(Expression), List(Token)), ParserError) {
   use #(_, remaining_tokens) <- result.try(next_token_is_left_bracket(
     remaining_tokens,
   ))
@@ -414,8 +411,8 @@ fn parse_array_elements(
 
 fn parse_array_elements_loop(
   remaining_tokens: List(Token),
-  elements: List(Node(Expression)),
-) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+  elements: List(Expression),
+) -> Result(#(List(Expression), List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
   case next_token {
     token.RightBracket(_) -> Ok(#(list.reverse(elements), remaining_tokens))
@@ -432,9 +429,9 @@ fn parse_array_elements_loop(
 
 fn parse_call_expression(
   remaining_tokens: List(Token),
-  function: Node(Expression),
+  function: Expression,
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(left_parenthesis_token, remaining_tokens) <- result.try(
     next_token_is_left_parenthesis(remaining_tokens),
   )
@@ -450,7 +447,7 @@ fn parse_call_expression(
 
 fn parse_call_arguments(
   remaining_tokens: List(Token),
-) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+) -> Result(#(List(Expression), List(Token)), ParserError) {
   use #(_, remaining_tokens) <- result.try(next_token_is_left_parenthesis(
     remaining_tokens,
   ))
@@ -459,8 +456,8 @@ fn parse_call_arguments(
 
 fn parse_call_arguments_loop(
   remaining_tokens: List(Token),
-  arguments: List(Node(Expression)),
-) -> Result(#(List(Node(Expression)), List(Token)), ParserError) {
+  arguments: List(Expression),
+) -> Result(#(List(Expression), List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
   case next_token {
     token.RightParenthesis(_) ->
@@ -478,9 +475,9 @@ fn parse_call_arguments_loop(
 
 fn parse_index_expression(
   remaining_tokens: List(Token),
-  left: Node(Expression),
+  left: Expression,
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(left_bracket_token, remaining_tokens) <- result.try(
     next_token_is_left_bracket(remaining_tokens),
   )
@@ -498,7 +495,7 @@ fn parse_index_expression(
 fn parse_hash_literal(
   remaining_tokens: List(Token),
   _op_precedence: OpPrecedence,
-) -> Result(#(Node(Expression), List(Token)), ParserError) {
+) -> Result(#(Expression, List(Token)), ParserError) {
   use #(left_brace_token, remaining_tokens) <- result.try(
     next_token_is_left_brace(remaining_tokens),
   )
@@ -511,20 +508,14 @@ fn parse_hash_literal(
 
 fn parse_hash_pairs(
   remaining_tokens: List(Token),
-) -> Result(
-  #(List(#(Node(Expression), Node(Expression))), List(Token)),
-  ParserError,
-) {
+) -> Result(#(List(#(Expression, Expression)), List(Token)), ParserError) {
   parse_hash_pairs_loop(remaining_tokens, [])
 }
 
 fn parse_hash_pairs_loop(
   remaining_tokens: List(Token),
-  pairs: List(#(Node(Expression), Node(Expression))),
-) -> Result(
-  #(List(#(Node(Expression), Node(Expression))), List(Token)),
-  ParserError,
-) {
+  pairs: List(#(Expression, Expression)),
+) -> Result(#(List(#(Expression, Expression)), List(Token)), ParserError) {
   use #(next_token, remaining_tokens) <- result.try(next_token(remaining_tokens))
   case next_token {
     token.RightBrace(_) -> Ok(#(list.reverse(pairs), remaining_tokens))
@@ -542,7 +533,7 @@ fn parse_hash_pairs_loop(
 fn parse_hash_pair(
   remaining_tokens: List(Token),
   op_precedence: OpPrecedence,
-) -> Result(#(#(Node(Expression), Node(Expression)), List(Token)), ParserError) {
+) -> Result(#(#(Expression, Expression), List(Token)), ParserError) {
   use #(key, remaining_tokens) <- result.try(parse_expression(
     remaining_tokens,
     op_precedence,
@@ -716,7 +707,7 @@ fn next_token_is_if_token(
 
 fn parse_else_expression(
   tokens: List(Token),
-) -> Result(#(Option(Node(Statement)), List(Token)), ParserError) {
+) -> Result(#(Option(Statement), List(Token)), ParserError) {
   case tokens |> next_token {
     Ok(#(next_token, remaining_tokens)) -> {
       case next_token {
@@ -836,7 +827,7 @@ fn next_token(tokens: List(Token)) -> Result(#(Token, List(Token)), ParserError)
   }
 }
 
-fn parsing_complete(program_statements: List(Node(Statement))) -> Node(Program) {
+fn parsing_complete(program_statements: List(Statement)) -> Program {
   ast.Program(token.eof, list.reverse(program_statements))
 }
 
