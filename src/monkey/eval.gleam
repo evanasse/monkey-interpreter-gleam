@@ -1,5 +1,6 @@
 import gleam/dict
 import gleam/int
+import gleam/io
 import gleam/list.{Continue, Stop}
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -9,6 +10,7 @@ import monkey/object.{
   type Environment, type HashKey, type HashPair, type Object, Array, Boolean,
   BuiltinFunction, Function, Hash, HashPair, Integer, Null, ReturnValue, String,
 }
+import monkey/token
 
 pub type EvalError {
   AdditionNotSupported(left: String, right: String)
@@ -269,23 +271,38 @@ fn eval_call_expression(
   arguments: List(ast.Expression),
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
-  use #(function, env) <- result.try(eval_expression(function, env))
-
-  case function {
-    Function(_, body, _function_env) -> {
-      use args <- result.try(eval_expression_list(arguments, env))
-      use extended_env <- result.try(extend_function_env(function, args))
-      use #(evaluated, _) <- result.try(eval_statement(body, extended_env))
-      Ok(#(unwrap_return_value(evaluated), env))
-    }
-    BuiltinFunction(func) -> {
-      use args <- result.try(eval_expression_list(arguments, env))
-      case func(args) {
-        Ok(outcome) -> Ok(#(outcome, env))
-        Error(e) -> Error(builtin_to_eval_error(e))
+  case function.token.literal == "quote" {
+    True -> {
+      case arguments |> list.first {
+        Ok(x) -> Ok(#(quote(x, env), env))
+        Error(_) ->
+          Error(WrongNumberOfArguments(expected: 1, got: list.length(arguments)))
       }
     }
-    _ -> Error(UnexpectedObject)
+    False -> {
+      use #(function_object, env) <- result.try(eval_expression(function, env))
+
+      case function_object {
+        Function(_, body, _function_env) -> {
+          use args <- result.try(eval_expression_list(arguments, env))
+          use extended_env <- result.try(extend_function_env(
+            function_object,
+            args,
+          ))
+          use #(evaluated, _) <- result.try(eval_statement(body, extended_env))
+          Ok(#(unwrap_return_value(evaluated), env))
+        }
+
+        BuiltinFunction(func) -> {
+          use args <- result.try(eval_expression_list(arguments, env))
+          case func(args) {
+            Ok(outcome) -> Ok(#(outcome, env))
+            Error(e) -> Error(builtin_to_eval_error(e))
+          }
+        }
+        _ -> Error(UnexpectedObject)
+      }
+    }
   }
 }
 
@@ -650,5 +667,47 @@ fn native_bool_to_boolean_object(
   case input {
     True -> Ok(#(object.true, env))
     False -> Ok(#(object.false, env))
+  }
+}
+
+fn quote(node: ast.Expression, env: object.Environment) -> object.Object {
+  let node = eval_unquote_calls(node, env)
+  object.Quote(node: node)
+}
+
+fn eval_unquote_calls(
+  quoted_node: ast.Expression,
+  env: object.Environment,
+) -> ast.Expression {
+  ast.modify_expression(quoted_node, fn(node: ast.Expression) -> ast.Expression {
+    case node {
+      ast.CallExpression(
+        _,
+        ast.Identifier(token: token.Identifier("unquote"), value: "unquote"),
+        [arg],
+      ) -> {
+        case eval_expression(arg, env) {
+          Ok(#(obj, _env)) -> convert_object_to_ast_node(obj)
+          _ -> node
+        }
+      }
+      _ -> node
+    }
+  })
+}
+
+fn convert_object_to_ast_node(obj: object.Object) -> ast.Expression {
+  case obj {
+    object.Integer(value) ->
+      ast.IntegerLiteral(token: token.Integer(int.to_string(value)), value:)
+    object.Boolean(value) -> {
+      case value {
+        True -> ast.BooleanLiteral(token: token.true, value:)
+        False -> ast.BooleanLiteral(token: token.true, value:)
+      }
+    }
+    object.Quote(node) -> node
+    // TODO: should not return a dummy integerliteral
+    _ -> ast.IntegerLiteral(token: token.Integer(int.to_string(0)), value: 0)
   }
 }

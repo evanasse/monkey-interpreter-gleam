@@ -28,6 +28,8 @@ pub const array_obj: ObjectType = "ARRAY"
 
 pub const hash_obj: ObjectType = "HASH"
 
+pub const quote_obj: ObjectType = "QUOTE"
+
 pub type Object {
   Null
   Integer(value: Int)
@@ -44,6 +46,7 @@ pub type Object {
   )
   Array(elements: List(Object))
   Hash(pairs: List(#(HashKey, HashPair)))
+  Quote(node: ast.Expression)
 }
 
 pub type BuiltinFunctionError {
@@ -69,6 +72,7 @@ pub fn get_type(object: Object) -> ObjectType {
     BuiltinFunction(_) -> builtin_obj
     Array(_) -> array_obj
     Hash(_) -> hash_obj
+    Quote(_) -> quote_obj
   }
 }
 
@@ -95,6 +99,7 @@ pub fn inspect(object: Object) -> String {
       })
       |> string.join(", ")
       <> "}"
+    Quote(node) -> quote_obj <> "(" <> ast.expression_to_string(node) <> ")"
   }
 }
 
