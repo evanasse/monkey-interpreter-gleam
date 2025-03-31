@@ -43,6 +43,7 @@ pub type Token {
   If(literal: String)
   Else(literal: String)
   Return(literal: String)
+  Macro(literal: String)
 }
 
 pub fn debug(token: Token) -> Token {
@@ -115,6 +116,8 @@ pub const else_: Token = Else("else")
 
 pub const return: Token = Return("return")
 
+pub const macro_: Token = Macro("macro")
+
 pub fn keywords() -> Dict(String, Token) {
   let keywords_list = [
     #(function.literal, function),
@@ -124,6 +127,7 @@ pub fn keywords() -> Dict(String, Token) {
     #(if_.literal, if_),
     #(else_.literal, else_),
     #(return.literal, return),
+    #(macro_.literal, macro_),
   ]
   dict.from_list(keywords_list)
 }

@@ -830,3 +830,42 @@ pub fn parse_hash_literal_with_expressions_test() {
   program
   |> should.equal(expected_program)
 }
+
+pub fn macro_literal_test() {
+  let input =
+    "
+macro(x, y) { x + y; }
+"
+
+  let assert Ok(tokens) = lexer.lex(input)
+
+  let assert Ok(program) = parser.parse(tokens)
+
+  let expected_program =
+    ast.Program(token.eof, [
+      ast.ExpressionStatement(
+        token: token.macro_,
+        expression: ast.MacroLiteral(
+          token: token.macro_,
+          parameters: [
+            ast.Identifier(token: token.Identifier("x"), value: "x"),
+            ast.Identifier(token: token.Identifier("y"), value: "y"),
+          ],
+          body: ast.BlockStatement(token: token.l_brace, statements: [
+            ast.ExpressionStatement(
+              token: token.plus,
+              expression: ast.InfixExpression(
+                token: token.plus,
+                left: ast.Identifier(token.Identifier("x"), "x"),
+                operator: token.plus.literal,
+                right: ast.Identifier(token.Identifier("y"), "y"),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    ])
+
+  program
+  |> should.equal(expected_program)
+}

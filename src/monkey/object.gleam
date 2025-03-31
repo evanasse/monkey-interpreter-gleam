@@ -30,6 +30,8 @@ pub const hash_obj: ObjectType = "HASH"
 
 pub const quote_obj: ObjectType = "QUOTE"
 
+pub const macro_obj: ObjectType = "MACRO"
+
 pub type Object {
   Null
   Integer(value: Int)
@@ -47,6 +49,7 @@ pub type Object {
   Array(elements: List(Object))
   Hash(pairs: List(#(HashKey, HashPair)))
   Quote(node: ast.Expression)
+  Macro(parameters: List(ast.Expression), body: ast.Statement, env: Environment)
 }
 
 pub type BuiltinFunctionError {
@@ -73,6 +76,7 @@ pub fn get_type(object: Object) -> ObjectType {
     Array(_) -> array_obj
     Hash(_) -> hash_obj
     Quote(_) -> quote_obj
+    Macro(_, _, _) -> macro_obj
   }
 }
 
@@ -100,6 +104,11 @@ pub fn inspect(object: Object) -> String {
       |> string.join(", ")
       <> "}"
     Quote(node) -> quote_obj <> "(" <> ast.expression_to_string(node) <> ")"
+    Macro(parameters, body, _) ->
+      "macro("
+      <> parameters |> list.map(ast.expression_to_string) |> string.join(", ")
+      <> ")"
+      <> ast.statement_to_string(body)
   }
 }
 
@@ -278,14 +287,14 @@ pub fn new_enclosed_env(outer: Environment) -> Environment {
 }
 
 pub fn get(
-  name name: String,
   from env: Environment,
+  name name: String,
 ) -> Result(Object, EnvironmentError) {
   case env.store |> dict.get(name) {
     Ok(o) -> Ok(o)
     Error(_) -> {
       case env.outer {
-        Some(outer) -> get(name, outer)
+        Some(outer) -> get(outer, name)
         None -> {
           case dict.get(builtin_functions(), name) {
             Ok(function) -> Ok(function)
@@ -298,9 +307,9 @@ pub fn get(
 }
 
 pub fn set(
+  in env: Environment,
   name name: String,
   to value: Object,
-  in env: Environment,
 ) -> Environment {
   Environment(dict.insert(env.store, name, value), env.outer)
 }

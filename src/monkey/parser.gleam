@@ -549,6 +549,26 @@ fn parse_hash_pair(
   Ok(#(#(key, value), remaining_tokens))
 }
 
+fn parse_macro_literal(
+  remaining_tokens: List(Token),
+  _op_precedence: OpPrecedence,
+) -> Result(#(Expression, List(Token)), ParserError) {
+  use #(macro_token, remaining_tokens) <- result.try(next_token_is_macro_token(
+    remaining_tokens,
+  ))
+  use #(parameters, remaining_tokens) <- result.try(parse_parameters(
+    remaining_tokens,
+  ))
+  use #(macro_body_block, remaining_tokens) <- result.try(parse_block_statement(
+    remaining_tokens,
+  ))
+
+  Ok(#(
+    ast.MacroLiteral(macro_token, parameters, macro_body_block),
+    remaining_tokens,
+  ))
+}
+
 fn next_token_has_prefix_function(
   tokens: List(Token),
 ) -> Result(PrefixParseFunction, ParserError) {
@@ -808,6 +828,20 @@ fn next_token_is_function_token(
   }
 }
 
+fn next_token_is_macro_token(
+  tokens: List(Token),
+) -> Result(#(Token, List(Token)), ParserError) {
+  case tokens |> next_token {
+    Ok(#(next_token, remaining_tokens)) -> {
+      case next_token {
+        token.Macro(_) -> Ok(#(next_token, remaining_tokens))
+        _ -> Error(UnexpectedToken([token.macro_], next_token))
+      }
+    }
+    Error(_) -> Error(ExpectedAToken)
+  }
+}
+
 fn next_token_may_be_semicolon(tokens: List(Token)) -> List(Token) {
   case tokens |> next_token {
     Ok(#(next_token, remaining_tokens)) -> {
@@ -845,6 +879,7 @@ fn get_prefix_parse_functions(
     token.Function(_) -> Ok(parse_function_literal)
     token.LeftBracket(_) -> Ok(parse_array_literal)
     token.LeftBrace(_) -> Ok(parse_hash_literal)
+    token.Macro(_) -> Ok(parse_macro_literal)
     _ -> Error(NoPrefixFunctionForToken(token))
   }
 }

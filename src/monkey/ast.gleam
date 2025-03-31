@@ -36,6 +36,7 @@ pub type Expression {
   )
   IndexExpression(token: Token, left: Expression, index: Expression)
   HashLiteral(token: Token, pairs: List(#(Expression, Expression)))
+  MacroLiteral(token: Token, parameters: List(Expression), body: Statement)
 }
 
 pub fn expression_to_string(expression: Expression) -> String {
@@ -57,6 +58,8 @@ pub fn expression_to_string(expression: Expression) -> String {
     ArrayLiteral(_, elements) -> array_literal_to_string(elements)
     IndexExpression(_, left, index) -> index_expression_to_string(left, index)
     HashLiteral(_, pairs) -> hash_literal_to_string(pairs)
+    MacroLiteral(_, parameters, body) ->
+      macro_literal_to_string(parameters, body)
   }
 }
 
@@ -181,6 +184,16 @@ fn hash_literal_to_string(pairs: List(#(Expression, Expression))) -> String {
   })
   |> string.join(", ")
   <> "}"
+}
+
+fn macro_literal_to_string(
+  parameters: List(Expression),
+  body: Statement,
+) -> String {
+  "macro("
+  <> parameters |> list.map(expression_to_string) |> string.join(", ")
+  <> ")"
+  <> statement_to_string(body)
 }
 
 type Modifier =

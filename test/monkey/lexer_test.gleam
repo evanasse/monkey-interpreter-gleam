@@ -27,6 +27,7 @@ if (5 < 10) {
 \"foo bar\"
 []
 {\"foo\": \"bar\"}
+macro(x, y) { x + y; };
 "
 
   let test_tokens = [
@@ -112,6 +113,19 @@ if (5 < 10) {
     token.colon,
     token.String("bar"),
     token.r_brace,
+    token.macro_,
+    token.l_paren,
+    token.Identifier("x"),
+    token.comma,
+    token.Identifier("y"),
+    token.r_paren,
+    token.l_brace,
+    token.Identifier("x"),
+    token.plus,
+    token.Identifier("y"),
+    token.semicolon,
+    token.r_brace,
+    token.semicolon,
     token.eof,
   ]
 

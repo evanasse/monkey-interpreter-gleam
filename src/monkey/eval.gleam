@@ -1,6 +1,5 @@
 import gleam/dict
 import gleam/int
-import gleam/io
 import gleam/list.{Continue, Stop}
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -8,7 +7,8 @@ import gleam/string
 import monkey/ast
 import monkey/object.{
   type Environment, type HashKey, type HashPair, type Object, Array, Boolean,
-  BuiltinFunction, Function, Hash, HashPair, Integer, Null, ReturnValue, String,
+  BuiltinFunction, Function, Hash, HashPair, Integer, Null, Quote, ReturnValue,
+  String,
 }
 import monkey/token
 
@@ -131,10 +131,11 @@ fn eval_expression(
     ast.IndexExpression(_, left, index) ->
       eval_index_expression(left, index, env)
     ast.HashLiteral(_, pairs) -> eval_hash_literal(pairs, env)
+    ast.MacroLiteral(_, parameters, body) -> todo
   }
 }
 
-fn eval_statement(
+pub fn eval_statement(
   statement: ast.Statement,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
@@ -329,7 +330,7 @@ fn extend_function_env(
         |> list.zip(args)
         |> list.fold(env, fn(acc, pair) {
           let assert ast.Identifier(_, value) = pair.0
-          object.set(value, pair.1, acc)
+          object.set(in: acc, name: value, to: pair.1)
         })
 
       Ok(extended_env)
@@ -370,7 +371,7 @@ fn eval_identifier(
   name: String,
   env: Environment,
 ) -> Result(#(Object, Environment), EvalError) {
-  case object.get(name, env) {
+  case object.get(env, name) {
     Ok(o) -> Ok(#(o, env))
     Error(e) ->
       case e {
@@ -397,7 +398,7 @@ fn eval_let_statement(
 
   case name {
     ast.Identifier(_, name) -> {
-      Ok(#(object.null, object.set(name, value, env)))
+      Ok(#(object.null, object.set(env, name, value)))
     }
     _ -> Error(UnexpectedNode)
   }
@@ -696,17 +697,17 @@ fn eval_unquote_calls(
   })
 }
 
-fn convert_object_to_ast_node(obj: object.Object) -> ast.Expression {
+fn convert_object_to_ast_node(obj: Object) -> ast.Expression {
   case obj {
-    object.Integer(value) ->
+    Integer(value) ->
       ast.IntegerLiteral(token: token.Integer(int.to_string(value)), value:)
-    object.Boolean(value) -> {
+    Boolean(value) -> {
       case value {
         True -> ast.BooleanLiteral(token: token.true, value:)
         False -> ast.BooleanLiteral(token: token.true, value:)
       }
     }
-    object.Quote(node) -> node
+    Quote(node) -> node
     // TODO: should not return a dummy integerliteral
     _ -> ast.IntegerLiteral(token: token.Integer(int.to_string(0)), value: 0)
   }
