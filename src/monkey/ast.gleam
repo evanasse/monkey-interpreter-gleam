@@ -199,7 +199,6 @@ fn macro_literal_to_string(
 type Modifier =
   fn(Expression) -> Expression
 
-// Est-ce que modify_expression est suffisant?
 pub fn modify(node: Node, modifier: Modifier) -> Node {
   case node {
     ProgramNode(program) -> {
