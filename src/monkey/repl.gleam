@@ -6,6 +6,7 @@ import monkey/lexer
 import monkey/macro_expansion.{define_macros}
 import monkey/object.{type Environment}
 import monkey/parser
+import monkey/parser_error
 import monkey/token
 
 const prompt = ">> "
@@ -13,7 +14,7 @@ const prompt = ">> "
 pub type ReplError {
   ReadingError(erlang.GetLineError)
   LexingError(lexer.LexingError)
-  ParsingError(parser.ParserError)
+  ParsingError(parser_error.ParserError)
   EvalError(eval.EvalError)
   MacroExpansionError(macro_expansion.MacroExpansionError)
 }
