@@ -38,7 +38,7 @@ fn lex_loop(
             Ok(_) ->
               Ok([token.eof, token.Integer(current_word), ..lexed_tokens])
             Error(_) ->
-              Ok([token.eof, lookup_ident(current_word), ..lexed_tokens])
+              Ok([token.eof, lookup_identifier(current_word), ..lexed_tokens])
           }
         }
       }
@@ -149,17 +149,20 @@ fn lex_symbol(
     Symbol(">") -> Ok(token.greater_than)
     Symbol("\"") -> Ok(token.double_quote)
     Symbol(":") -> Ok(token.colon)
-    unexpected_type ->
-      Error(WrongCharType(expected: Symbol("symbol"), got: unexpected_type))
+    unexpected_token_type ->
+      Error(WrongCharType(
+        expected: Symbol("symbol"),
+        got: unexpected_token_type,
+      ))
   }
 
   let symbol_length = case symbol_token {
-    Ok(st) -> string.length(st.literal)
+    Ok(symbol_token) -> string.length(symbol_token.literal)
     Error(_) -> 1
   }
 
   let remaining_input = case symbol_length {
-    l if l > 1 -> string.drop_start(remaining_input, l)
+    length if length > 1 -> string.drop_start(remaining_input, length)
     _ -> remaining_input
   }
 
@@ -180,7 +183,7 @@ fn lex_symbol(
     ReadingIdentifier, Ok(token) ->
       lex_loop(
         remaining_input,
-        [token, lookup_ident(current_word), ..lexed_tokens],
+        [token, lookup_identifier(current_word), ..lexed_tokens],
         "",
         SkippingWhitespace,
       )
@@ -223,7 +226,7 @@ fn lex_whitespace(
     ReadingIdentifier -> {
       lex_loop(
         remaining_input,
-        [lookup_ident(current_word), ..lexed_tokens],
+        [lookup_identifier(current_word), ..lexed_tokens],
         "",
         SkippingWhitespace,
       )
@@ -256,7 +259,7 @@ fn lex_whitespace(
         _ ->
           lex_loop(
             remaining_input,
-            [lookup_ident(current_word), ..lexed_tokens],
+            [lookup_identifier(current_word), ..lexed_tokens],
             current_word,
             SkippingWhitespace,
           )
@@ -265,7 +268,7 @@ fn lex_whitespace(
   }
 }
 
-fn lookup_ident(identifier: String) -> Token {
+fn lookup_identifier(identifier: String) -> Token {
   case dict.get(token.keywords(), identifier) {
     Ok(keyword_token) -> keyword_token
     Error(_) -> token.Identifier(identifier)
